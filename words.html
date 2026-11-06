@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kelime Defteri</title>
+  <title>Almanca Kelime Asistanı</title>
   <link rel="stylesheet" href="pages.css">
   <style>
     .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
@@ -28,17 +28,18 @@
 </head>
 <body>
 <main>
-  <h1>Kelime Defteri</h1>
-  <p class="lead"><span class="count" id="count">0 kelime</span> · <a href="options.html">Ayarlar</a></p>
+  <h1 data-i18n="wordsTitle"></h1>
+  <p class="lead"><span class="count" id="count"></span> · <a href="options.html" data-i18n="wordsSettings"></a></p>
 
   <div class="toolbar">
-    <input type="search" id="search" placeholder="Ara (Almanca veya Türkçe)…">
-    <button class="btn ghost" id="export">CSV indir (Anki)</button>
-    <button class="btn danger" id="clear">Tümünü sil</button>
+    <input type="search" id="search" data-i18n-placeholder="wordsSearch">
+    <button class="btn ghost" id="export" data-i18n="wordsExport"></button>
+    <button class="btn danger" id="clear" data-i18n="wordsClear"></button>
   </div>
 
   <div class="list" id="list"></div>
 </main>
+<script src="i18n.js"></script>
 <script src="words.js"></script>
 </body>
 </html>

@@ -9,6 +9,8 @@
   let lastContext = null; // { word, context, x, y } — son sağ tık
   let host = null;
   let lookupSeq = 0;
+  let lang = "tr"; // dil çifti; her komutta background'dan gelir
+  const t = (key, vars) => globalThis.almancaT(lang, key, vars);
 
   // ---------- Kelimeyi yakala ----------
 
@@ -75,6 +77,7 @@
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type !== "ALMANCA_SHOW") return;
+    lang = msg.lang === "en" ? "en" : "tr";
     const sel = window.getSelection();
     let word = msg.selectionText || "";
     let context = "";
@@ -96,7 +99,7 @@
 
     word = word.replace(/\s+/g, " ").trim().slice(0, 80);
     if (!word) {
-      showCard(anchor, renderMessage("Kelime bulunamadı", "İmleci bir kelimenin üstüne getirip sağ tıkla ya da kelimeyi seç."));
+      showCard(anchor, renderMessage(t("notFoundTitle"), t("notFoundHint")));
       return;
     }
     runLookup(word, context, anchor);
@@ -112,7 +115,7 @@
       return;
     }
     if (!res.data.found) {
-      showCard(anchor, renderMessage(word, "Bu kelime için sözlük kaydı bulunamadı."));
+      showCard(anchor, renderMessage(word, t("noEntry")));
       return;
     }
     showCard(anchor, renderResult(word, res.data), { word, context, data: res.data });
@@ -122,11 +125,11 @@
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendMessage(msg, (res) => {
-          if (chrome.runtime.lastError) resolve({ ok: false, error: "Eklenti yeniden yüklenmiş; sayfayı yenile." });
+          if (chrome.runtime.lastError) resolve({ ok: false, error: t("reloaded") });
           else resolve(res);
         });
       } catch {
-        resolve({ ok: false, error: "Eklenti yeniden yüklenmiş; sayfayı yenile." });
+        resolve({ ok: false, error: t("reloaded") });
       }
     });
   }
@@ -219,7 +222,7 @@
   function showCard(anchor, html, state = {}) {
     const h = ensureHost();
     const card = h.shadowRoot.querySelector(".card");
-    card.innerHTML = `<button class="close" title="Kapat" data-act="close">×</button>${html}`;
+    card.innerHTML = `<button class="close" title="${esc(t("close"))}" data-act="close">×</button>${html}`;
     bindActions(card, state);
     position(h, anchor);
   }
@@ -264,7 +267,7 @@
         if (act === "save" && state.data) {
           el.disabled = true;
           const res = await send({ type: "SAVE_WORD", entry: makeEntry(state) });
-          el.textContent = res?.ok ? "Kaydedildi ✓" : "Kaydedilemedi";
+          el.textContent = res?.ok ? t("saved") : t("saveFailed");
         }
       });
     });
@@ -273,7 +276,7 @@
       const btn = card.querySelector('[data-act="save"]');
       send({ type: "IS_SAVED", key: entryKey(state.data) }).then((res) => {
         if (res?.ok && res.data && btn) {
-          btn.textContent = "Kaydedildi ✓";
+          btn.textContent = t("saved");
           btn.disabled = true;
         }
       });
@@ -293,9 +296,10 @@
       word_type: data.word_type,
       ipa: data.ipa,
       level: data.level,
-      meaning_tr: data.meaning_tr || data.meaning_en || data.definition_de,
+      lang,
+      meaning: data.meaning || data.definition_de,
       example_de: data.example_de,
-      example_tr: data.example_tr,
+      example_translation: data.example_translation,
       verb: data.verb,
       original: word,
       sentence: context,
@@ -343,7 +347,7 @@
 
   function renderLoading(word) {
     return `<div class="head"><div class="spinner"></div><span class="lemma" style="font-size:16px">${esc(word)}</span></div>
-      <div class="sub">Aranıyor…</div>`;
+      <div class="sub">${esc(t("searching"))}</div>`;
   }
 
   function renderMessage(title, text) {
@@ -353,79 +357,80 @@
 
   function renderError(res) {
     const needsKey = res?.code === "NO_KEY" || res?.code === "BAD_KEY";
-    if (res?.code === "RATE") {
-      return `<div class="head"><span class="lemma" style="font-size:16px">Biraz bekle</span></div>
-        <div class="sub" style="margin-top:6px">${esc(res.error)}</div>
-        <div class="actions"><button class="btn" data-act="retry">Tekrar dene</button></div>`;
-    }
-    return `<div class="head"><span class="lemma err" style="font-size:16px">Bir sorun oluştu</span></div>
-      <div class="sub" style="margin-top:6px">${esc(res?.error || "Bilinmeyen hata.")}</div>
-      <div class="actions">
-        ${needsKey ? `<button class="btn" data-act="options">Ayarları aç</button>` : `<button class="btn" data-act="retry">Tekrar dene</button>`}
-      </div>`;
+    const isRate = res?.code === "RATE";
+    const action = needsKey
+      ? `<button class="btn" data-act="options">${esc(t("openSettings"))}</button>`
+      : `<button class="btn" data-act="retry">${esc(t("retry"))}</button>`;
+    return `<div class="head"><span class="lemma ${isRate ? "" : "err"}" style="font-size:16px">${esc(isRate ? t("waitTitle") : t("errorTitle"))}</span></div>
+      <div class="sub" style="margin-top:6px">${esc(res?.error || t("unknownError"))}</div>
+      <div class="actions">${action}</div>`;
+  }
+
+  function tag(text) {
+    return text ? `<span class="tag">${esc(text)}</span> ` : "";
   }
 
   function renderResult(word, d) {
     const art = d.article;
     const spoken = art ? `${art} ${d.lemma}` : d.lemma;
-    const typeLabel = d.word_type && d.word_type !== "diğer" ? d.word_type : "";
+    const typeLabel = d.word_type ? t(`type_${d.word_type}`) : "";
     const v = d.verb || {};
-    const isVerb = d.word_type === "fiil" && (v.praeteritum || v.perfekt);
+    const isVerb = d.word_type === "verb" && (v.praeteritum || v.perfekt);
 
     const chips = [
-      typeLabel && `<span class="chip">${esc(typeLabel)}</span>`,
-      d.level && `<span class="chip lv lv-${esc(d.level.slice(0, 2))}" title="${
-        "Yaklaşık CEFR seviyesi (Claude tahmini)"
-      }">${esc(d.level)}</span>`,
-      d.plural && d.plural !== "—" && `<span class="chip">Çoğul: ${esc(d.plural)}</span>`,
-      d.plural === "—" && `<span class="chip">Çoğulu yok</span>`,
+      typeLabel && typeLabel !== `type_${d.word_type}` && `<span class="chip">${esc(typeLabel)}</span>`,
+      d.level && `<span class="chip lv lv-${esc(d.level.slice(0, 2))}" title="${esc(t("levelTitle"))}">${esc(d.level)}</span>`,
+      d.plural && d.plural !== "—" && `<span class="chip">${esc(t("plural", { x: d.plural }))}</span>`,
+      d.plural === "—" && `<span class="chip">${esc(t("noPlural"))}</span>`,
     ].filter(Boolean).join("");
 
     const inputNote = d.note
       ? `<div class="note">${esc(d.note)}</div>`
       : d.detected_language !== "de" && word.toLowerCase() !== String(d.lemma).toLowerCase()
-        ? `<div class="note">"${esc(word)}" kelimesinin Almancası</div>`
+        ? `<div class="note">${esc(t("germanOf", { w: word }))}</div>`
         : "";
 
     let meaning = "";
-    if (d.meaning_tr) meaning = `<div class="meaning">${esc(d.meaning_tr)}</div>`;
-    else if (d.definition_de) meaning = `<div class="meaning">${esc(d.definition_de)}</div><div class="sub">Türkçe anlam bulunamadı; Almanca tanım gösteriliyor.</div>`;
-    else if (d.meaning_en) meaning = `<div class="meaning">${esc(d.meaning_en)}</div>`;
+    if (d.meaning) meaning = `<div class="meaning">${esc(d.meaning)}</div>`;
+    else if (d.definition_de) meaning = `<div class="meaning">${esc(d.definition_de)}</div><div class="sub">${esc(t("noMeaningDef"))}</div>`;
     const extraMeaning = [
-      d.meaning_en && (d.meaning_tr || d.definition_de) ? `<span class="tag">İng.</span> ${esc(d.meaning_en)}` : "",
-      d.definition_de && d.meaning_tr ? `<span class="tag">Tanım</span> ${esc(d.definition_de)}` : "",
+      d.meaning_alt && d.meaning ? `${tag(t("tagAlt"))}${esc(d.meaning_alt)}` : "",
+      d.definition_de && d.meaning ? `${tag(t("tagDef"))}${esc(d.definition_de)}` : "",
     ].filter(Boolean).map((x) => `<div class="sub">${x}</div>`).join("");
 
+    const caseText = v.case === "intransitive" ? t("intransitive") : v.case;
     const verbSection = isVerb
-      ? `<div class="section"><div class="label">Fiil bilgisi</div><dl class="grid">
+      ? `<div class="section"><div class="label">${esc(t("verbInfo"))}</div><dl class="grid">
           ${v.praeteritum ? `<dt>Präteritum</dt><dd>${esc(v.praeteritum)}</dd>` : ""}
           ${v.perfekt ? `<dt>Perfekt</dt><dd>${esc(v.perfekt)}</dd>` : ""}
-          ${v.separable ? `<dt>Ayrılabilen</dt><dd>${esc(v.separable_example || "evet")}</dd>` : ""}
-          ${v.case ? `<dt>Hâl</dt><dd>${esc(v.case)}</dd>` : ""}
+          ${v.separable ? `<dt>${esc(t("separable"))}</dt><dd>${esc(v.separable_example || t("yes"))}</dd>` : ""}
+          ${caseText ? `<dt>${esc(t("case"))}</dt><dd>${esc(caseText)}</dd>` : ""}
         </dl></div>`
       : "";
 
     const compound =
       Array.isArray(d.compound_parts) && d.compound_parts.length > 1
-        ? `<div class="section"><div class="label">Birleşik kelime</div>${esc(d.lemma)} = ${d.compound_parts.map(esc).join(" + ")}</div>`
+        ? `<div class="section"><div class="label">${esc(t("compound"))}</div>${esc(d.lemma)} = ${d.compound_parts.map(esc).join(" + ")}</div>`
         : "";
 
-    const exTr = d.example_tr
-      ? `<div class="ex-tr">${d.example_lang === "en" ? `<span class="tag">İng.</span> ` : ""}${esc(d.example_tr)}</div>`
+    // Çeviri seçili dil çiftinden farklı bir dildeyse (ör. Türkçe yerine İngilizce) etiketlenir
+    const otherLang = d.example_translation_lang && d.example_translation_lang !== lang;
+    const exTr = d.example_translation
+      ? `<div class="ex-tr">${otherLang ? tag(t("tagEnglish")) : ""}${esc(d.example_translation)}</div>`
       : "";
     const exSrc = d.example_url
       ? ` · <a href="${esc(d.example_url)}" target="_blank" rel="noopener">Tatoeba</a>`
       : "";
     const example = d.example_de
-      ? `<div class="section"><div class="label">Örnek cümle${exSrc}</div>
-          <div class="row">${speakBtn(d.example_de, "Cümleyi seslendir")}
+      ? `<div class="section"><div class="label">${esc(t("example"))}${exSrc}</div>
+          <div class="row">${speakBtn(d.example_de, t("speakSentence"))}
             <div><div class="ex-de">${esc(d.example_de)}</div>${exTr}</div>
           </div></div>`
       : "";
 
     return `
       <div class="head">
-        ${speakBtn(spoken, "Kelimeyi seslendir")}
+        ${speakBtn(spoken, t("speakWord"))}
         <span class="lemma ${esc(art)}">${art ? `<span class="art ${esc(art)}">${esc(art)}</span> ` : ""}${esc(d.lemma)}</span>
       </div>
       ${d.ipa ? `<div class="sub">${esc(d.ipa)}</div>` : ""}
@@ -436,7 +441,7 @@
       ${verbSection}
       ${compound}
       ${example}
-      <div class="actions"><button class="btn" data-act="save">Kaydet</button>
-        ${d.source ? `<span class="src">Kaynak: ${esc(d.source)}</span>` : ""}</div>`;
+      <div class="actions"><button class="btn" data-act="save">${esc(t("save"))}</button>
+        ${d.source ? `<span class="src">${esc(t("source", { s: d.source }))}</span>` : ""}</div>`;
   }
 })();

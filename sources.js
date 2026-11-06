@@ -1,7 +1,11 @@
 // Anahtarsız sözlük: Wiktionary (de / tr / en) + Tatoeba
 // Hem service worker'da hem de Node'da (test için) çalışır.
+// Dil çifti: "tr" (Almanca–Türkçe) veya "en" (Almanca–İngilizce).
 
-const HEADERS = { "Api-User-Agent": "AlmancaKelimeAsistani/0.2 (Chrome extension)" };
+import "./i18n.js";
+
+const T = (...a) => globalThis.almancaT(...a);
+const HEADERS = { "Api-User-Agent": "AlmancaKelimeAsistani/0.3 (Chrome extension)" };
 const DE = "de.wiktionary.org";
 const TR = "tr.wiktionary.org";
 const EN = "en.wiktionary.org";
@@ -11,10 +15,12 @@ const FORM_TYPES = new Set([
   "Partizip I", "Partizip II", "Erweiterter Infinitiv", "Flektierte Form",
 ]);
 
+/** Hata kodu taşır; kullanıcıya gösterilecek metin background'da seçili dile göre üretilir. */
 export class LookupError extends Error {
-  constructor(code, message) {
-    super(message);
+  constructor(code, status = "") {
+    super(code);
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -27,15 +33,15 @@ async function getJSON(url, attempt = 0) {
   try {
     res = await fetch(url, { headers: HEADERS });
   } catch {
-    throw new LookupError("NETWORK", "Ağ hatası: sözlüğe ulaşılamadı.");
+    throw new LookupError("NETWORK");
   }
   if (res.status === 429 && attempt < 2) {
     const wait = Math.min(Number(res.headers.get("retry-after")) || 2, 5);
     await sleep(wait * 1000);
     return getJSON(url, attempt + 1);
   }
-  if (res.status === 429) throw new LookupError("RATE", "Sözlük şu an çok yoğun. Birkaç saniye sonra tekrar dene.");
-  if (!res.ok) throw new LookupError("SERVER", `Sözlük yanıt vermedi (${res.status}).`);
+  if (res.status === 429) throw new LookupError("RATE");
+  if (!res.ok) throw new LookupError("SERVER", res.status);
   return res.json();
 }
 
@@ -82,6 +88,8 @@ function cleanWiki(s) {
     .replace(/\s+/g, " ")
     .replace(/^[\s,;:.]+/, "")
     .replace(/\(\s*\)/g, "")
+    .replace(/\s+([,;.!?)])/g, "$1")
+    .replace(/[,;]\s*$/, "")
     .trim();
 }
 
@@ -129,20 +137,21 @@ function tplParam(body, name) {
   return m ? m[1].trim() : "";
 }
 
+/** de.wiktionary "Wortart" → dilden bağımsız tür kodu (noun, verb, adj ...). */
 function wordType(wortart) {
   const w = wortart.toLowerCase();
-  if (["substantiv", "toponym", "vorname", "nachname", "eigenname"].includes(w)) return "isim";
-  if (w.includes("verb") && !w.includes("adverb")) return "fiil";
-  if (w === "adjektiv") return "sıfat";
-  if (w.includes("adverb")) return "zarf";
-  if (w.includes("präposition") || w === "postposition") return "edat";
-  if (w.includes("konjunktion") || w === "subjunktion") return "bağlaç";
-  if (w.includes("pronomen")) return "zamir";
-  if (w.includes("artikel")) return "artikel";
-  if (w.includes("interjektion")) return "ünlem";
-  if (w.includes("numerale") || w.includes("zahl")) return "sayı";
-  if (w.includes("redewendung") || w.includes("wortverbindung") || w.includes("sprichwort")) return "ifade";
-  return "diğer";
+  if (["substantiv", "toponym", "vorname", "nachname", "eigenname"].includes(w)) return "noun";
+  if (w.includes("verb") && !w.includes("adverb")) return "verb";
+  if (w === "adjektiv") return "adj";
+  if (w.includes("adverb")) return "adv";
+  if (w.includes("präposition") || w === "postposition") return "prep";
+  if (w.includes("konjunktion") || w === "subjunktion") return "conj";
+  if (w.includes("pronomen")) return "pron";
+  if (w.includes("artikel")) return "article";
+  if (w.includes("interjektion")) return "interj";
+  if (w.includes("numerale") || w.includes("zahl")) return "num";
+  if (w.includes("redewendung") || w.includes("wortverbindung") || w.includes("sprichwort")) return "phrase";
+  return "other";
 }
 
 const GENUS = { m: "der", f: "die", n: "das" };
@@ -155,7 +164,7 @@ function parseGermanBlock(block, title) {
 
   let article = "";
   let plural = "";
-  if (type === "isim") {
+  if (type === "noun") {
     const g = tplParam(body, "Genus") || tplParam(body, "Genus 1") || (heading.match(/\{\{([mfn])\}\}/) || [])[1] || "";
     article = GENUS[g] || "";
     const pl = tplParam(body, "Nominativ Plural") || tplParam(body, "Nominativ Plural 1");
@@ -171,7 +180,7 @@ function parseGermanBlock(block, title) {
   const definitions = defLines.map((l) => cleanWiki(l.replace(/^:\[[^\]]*\]/, ""))).filter(Boolean);
 
   const verb = { praeteritum: "", perfekt: "", separable: false, separable_example: "", case: "" };
-  if (type === "fiil") {
+  if (type === "verb") {
     const praet = tplParam(body, "Präteritum_ich");
     const part = tplParam(body, "Partizip II");
     const aux = tplParam(body, "Hilfsverb");
@@ -183,7 +192,7 @@ function parseGermanBlock(block, title) {
     const firstDef = defLines[0] || "";
     if (/mit Dativ|\+\s*Dat/.test(firstDef)) verb.case = "+ Dativ";
     else if (/mit Akkusativ|\+\s*Akk|\{\{K\|[^}]*\btrans\./.test(firstDef)) verb.case = "+ Akkusativ";
-    else if (/intrans\./.test(firstDef)) verb.case = "geçişsiz (nesne almaz)";
+    else if (/intrans\./.test(firstDef)) verb.case = "intransitive"; // arayüzde çevrilir
   }
 
   // Örnekler (Almanca, çevirisiz)
@@ -253,7 +262,7 @@ function analyzeGermanPage(text, title) {
   return { redirectTo: base?.trim() || null, merkmal: merkmal.replace(/\s+(des|der|von)\s+\S+.*$/, ""), formIpa: ipa };
 }
 
-async function fetchGerman(word) {
+async function fetchGerman(word, lang) {
   const variants = uniq([word, word.toLowerCase(), cap(word.toLowerCase()), cap(word)]);
   const pages = await wikiPages(DE, variants);
   for (const p of pages) {
@@ -265,7 +274,7 @@ async function fetchGerman(word) {
       const [lp] = await wikiPages(DE, [a.redirectTo]);
       const la = lp?.text && analyzeGermanPage(lp.text, lp.title);
       if (la?.entry) {
-        const note = `"${p.title}", ${la.entry.lemma} kelimesinin çekimli hâli${a.merkmal ? ` (${a.merkmal})` : ""}.`;
+        const note = T(lang, "inflectedNote", { form: p.title, lemma: la.entry.lemma, m: a.merkmal ? ` (${a.merkmal})` : "" });
         return { entry: la.entry, note };
       }
     }
@@ -324,9 +333,8 @@ async function fetchTurkishMeaning(lemma) {
 
 // ---------- Ters yön: Türkçe / İngilizce → Almanca ----------
 
-async function reverseLookup(word) {
+async function reverseFromTurkish(word) {
   const lower = word.toLowerCase();
-  // Türkçe
   try {
     const pages = await wikiPages(TR, uniq([lower, word]));
     for (const p of pages) {
@@ -334,8 +342,12 @@ async function reverseLookup(word) {
       const cands = line ? [...line[1].matchAll(/\{\{ç\|de\|([^|}]+)/g)].map((x) => x[1].trim()) : [];
       if (cands.length) return { lang: "tr", candidates: uniq(cands) };
     }
-  } catch { /* devam */ }
-  // İngilizce
+  } catch { /* isteğe bağlı */ }
+  return null;
+}
+
+async function reverseFromEnglish(word) {
+  const lower = word.toLowerCase();
   try {
     // Büyük çeviri tabloları "kelime/translations" alt sayfasındadır; önce ona bak.
     const pages = await wikiPages(EN, uniq([`${lower}/translations`, lower, word]));
@@ -344,15 +356,69 @@ async function reverseLookup(word) {
       const cands = line ? [...line[1].matchAll(/\{\{tt?\+?\|de\|([^|}]+)/g)].map((x) => x[1].trim()) : [];
       if (cands.length) return { lang: "en", candidates: uniq(cands) };
     }
-  } catch { /* devam */ }
+  } catch { /* isteğe bağlı */ }
   return null;
+}
+
+/** Türkçe/İngilizce kelimenin Almanca karşılıkları. Almanca–İngilizce çiftinde yalnızca İngilizceye bakılır. */
+async function reverseLookup(word, lang) {
+  if (lang === "en") return reverseFromEnglish(word);
+  return (await reverseFromTurkish(word)) || (await reverseFromEnglish(word));
+}
+
+// ---------- en.wiktionary: Almanca kelimelerin İngilizce anlamı ----------
+
+const EN_POS = /^(Noun|Proper noun|Verb|Adjective|Adverb|Preposition|Postposition|Conjunction|Pronoun|Article|Determiner|Interjection|Numeral|Particle|Phrase|Proverb|Prefix|Suffix|Contraction)$/;
+
+function parseEnGerman(text) {
+  const m = text?.match(/^==\s*German\s*==[ \t]*$/m);
+  if (!m) return null;
+  const rest = text.slice(m.index + m[0].length);
+  const next = rest.search(/^==[^=]/m);
+  const sec = next >= 0 ? rest.slice(0, next) : rest;
+
+  const defs = [];
+  const examples = [];
+  let collecting = false;
+  for (const line of sec.split("\n")) {
+    const h = line.match(/^(=+)\s*([^=]+?)\s*=+\s*$/);
+    if (h) {
+      collecting = EN_POS.test(h[2]);
+      continue;
+    }
+    if (!collecting) continue;
+    if (/^#:/.test(line)) {
+      // {{ux|de|Almanca|İngilizce}} veya {{uxi|de|Almanca|t=İngilizce}}
+      const flat = line.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, "$1");
+      const ux = flat.match(/\{\{uxi?\|de\|([^|}]+)\|(?:t=|translation=)?([^|}]+)/);
+      if (ux) examples.push({ de: cleanWiki(ux[1]), tr: cleanWiki(ux[2]) });
+    } else if (/^#(?![*:#])/.test(line)) {
+      // Çekim bildiren tanımlar ("plural of ...") atlanır
+      if (/\{\{(?:[\w-]+ )?(?:form|plural|inflection|participle|past|singular)[\w -]*of\|/i.test(line)) continue;
+      const d = cleanWiki(line.replace(/^#\s*/, ""));
+      if (d && (!defs.length || d.length <= 60)) defs.push(d.length > 90 ? `${d.slice(0, 87)}…` : d);
+    }
+  }
+  return { defs, examples: examples.filter((e) => e.de && e.tr) };
+}
+
+async function fetchEnglishMeaning(lemma) {
+  try {
+    const pages = await wikiPages(EN, uniq([lemma, cap(lemma), lemma.toLowerCase()]));
+    for (const p of pages) {
+      const r = p.text && parseEnGerman(p.text);
+      if (r && (r.defs.length || r.examples.length)) return r;
+    }
+  } catch { /* isteğe bağlı kaynak */ }
+  return { defs: [], examples: [] };
 }
 
 // ---------- Tatoeba: örnek cümleler ----------
 
-async function tatoebaExample(lemma, alsoMatch = []) {
+async function tatoebaExample(lemma, alsoMatch = [], pairLang = "tr") {
   const forms = uniq([lemma, ...alsoMatch]).map((f) => f.toLowerCase());
-  for (const lang of ["tur", "eng"]) {
+  const langs = pairLang === "en" ? ["eng"] : ["tur", "eng"];
+  for (const lang of langs) {
     try {
       const url = new URL("https://api.tatoeba.org/unstable/sentences");
       url.searchParams.set("lang", "deu");
@@ -362,7 +428,7 @@ async function tatoebaExample(lemma, alsoMatch = []) {
       url.searchParams.set("limit", "30");
       const d = await getJSON(url);
       const rows = (d.data || [])
-        .map((r) => ({ id: r.id, de: r.text, tr: r.translations?.find((t) => t.lang === lang)?.text }))
+        .map((r) => ({ id: r.id, de: r.text, tr: r.translations?.find((x) => x.lang === lang)?.text }))
         .filter((r) => r.tr && r.de.split(/\s+/).length >= 3 && r.de.length <= 100);
       if (!rows.length) continue;
       const withForm = rows.find((r) => forms.some((f) => r.de.toLowerCase().includes(f)));
@@ -386,7 +452,7 @@ async function guessCompound(word) {
   const heads = [];
   for (const p of pages) {
     const a = p.text && analyzeGermanPage(p.text, p.title);
-    if (a?.entry?.word_type === "isim") {
+    if (a?.entry?.word_type === "noun") {
       const prefix = W.slice(0, W.length - p.requested.length);
       const stripped = prefix.replace(/(es|en|er|s|n|e)$/, "");
       heads.push({ head: a.entry, prefix, variants: uniq([prefix, stripped, prefix.toLowerCase(), stripped.toLowerCase()]) });
@@ -405,7 +471,7 @@ async function guessCompound(word) {
   // 3) Ön parçası da isim olan bölmeyi tercih et (Krankenhaus + Besuch), yoksa herhangi bir kayıt, yoksa ilki
   const pickFor = (h) => h.variants.map((v) => entryOf.get(v)).find(Boolean) || null;
   const choice =
-    heads.find((h) => pickFor(h)?.word_type === "isim") ||
+    heads.find((h) => pickFor(h)?.word_type === "noun") ||
     heads.find((h) => pickFor(h)) ||
     heads[0];
   const prefixEntry = pickFor(choice);
@@ -413,31 +479,42 @@ async function guessCompound(word) {
   return { head: choice.head, prefix: choice.prefix, prefixEntry, parts: [...prefixParts, choice.head.lemma] };
 }
 
-function firstMeaning(entry) {
+function firstMeaning(entry, lang) {
+  if (lang === "en") return entry?.translations_en?.[0] || "";
   return entry?.translations_tr?.[0] || entry?.translations_en?.[0] || "";
 }
 
+const EMPTY_VERB = { praeteritum: "", perfekt: "", separable: false, separable_example: "", case: "" };
+
 // ---------- Ana fonksiyon ----------
 
-export async function freeLookup(rawWord, direction = "auto") {
+/**
+ * @param {string} rawWord  Tıklanan kelime veya ifade
+ * @param {"auto"|"from-de"|"to-de"} direction
+ * @param {"tr"|"en"} lang  Dil çifti: Almanca–Türkçe veya Almanca–İngilizce
+ */
+export async function freeLookup(rawWord, direction = "auto", lang = "tr") {
   const word = String(rawWord || "").trim().replace(/^[„“"'(]+|[.,;:!?"“”')]+$/g, "");
-  if (!word) throw new LookupError("EMPTY", "Kelime bulunamadı.");
+  if (!word) throw new LookupError("EMPTY");
 
   let detected = "de";
   let found = null;
   let reverseNote = "";
 
-  if (direction !== "tr-de") found = await fetchGerman(word);
+  if (direction !== "to-de") found = await fetchGerman(word, lang);
 
-  if (!found && direction !== "de-tr") {
-    const rev = await reverseLookup(word);
+  if (!found && direction !== "from-de") {
+    const rev = await reverseLookup(word, lang);
     if (rev) {
       for (const cand of rev.candidates.slice(0, 3)) {
-        found = await fetchGerman(cand);
+        found = await fetchGerman(cand, lang);
         if (found) {
           detected = rev.lang;
           const others = rev.candidates.filter((c) => c !== found.entry.lemma).slice(0, 3);
-          reverseNote = `"${word}" kelimesinin Almancası${others.length ? ` (diğer karşılıklar: ${others.join(", ")})` : ""}.`;
+          reverseNote = T(lang, "reverseNote", {
+            w: word,
+            others: others.length ? T(lang, "reverseOthers", { list: others.join(", ") }) : "",
+          });
           break;
         }
       }
@@ -445,36 +522,36 @@ export async function freeLookup(rawWord, direction = "auto") {
   }
 
   // Sözlükte yoksa: birleşik kelime tahmini
-  if (!found && direction !== "tr-de") {
+  if (!found && direction !== "to-de") {
     const comp = await guessCompound(word);
     if (comp) {
       const { head, prefix, prefixEntry, parts } = comp;
       const headPl = head.plural.startsWith("die ") ? head.plural.slice(4) : "";
       const lemma = cap(word);
-      const ex = await tatoebaExample(lemma);
-      const partMeanings = [
-        `${prefixEntry?.lemma || prefix}${firstMeaning(prefixEntry) ? ` (${firstMeaning(prefixEntry)})` : ""}`,
-        `${head.lemma}${firstMeaning(head) ? ` (${firstMeaning(head)})` : ""}`,
-      ];
+      const ex = await tatoebaExample(lemma, [], lang);
+      const part = (e, fallback) => {
+        const m = firstMeaning(e, lang);
+        return `${e?.lemma || fallback}${m ? ` (${m})` : ""}`;
+      };
       return {
         found: true,
         detected_language: "de",
         lemma,
-        word_type: "isim",
+        word_type: "noun",
         article: head.article,
         plural: headPl ? `die ${prefix}${headPl.toLowerCase()}` : "",
         ipa: "",
-        meaning_tr: partMeanings.join(" + "),
-        meaning_en: "",
+        meaning: `${part(prefixEntry, prefix)} + ${part(head, head.lemma)}`,
+        meaning_alt: "",
         definition_de: "",
         level: "",
-        verb: { praeteritum: "", perfekt: "", separable: false, separable_example: "", case: "" },
+        verb: EMPTY_VERB,
         compound_parts: parts,
         example_de: ex?.de || "",
-        example_tr: ex?.tr || "",
-        example_lang: ex?.lang || "",
+        example_translation: ex?.tr || "",
+        example_translation_lang: ex?.lang || "",
         example_url: ex?.url || "",
-        note: "Sözlükte ayrı kaydı yok; anlam parçalarından tahmin edildi. Artikel son parçadan gelir.",
+        note: T(lang, "compoundNote"),
         source: "Wiktionary · Tatoeba",
       };
     }
@@ -483,14 +560,23 @@ export async function freeLookup(rawWord, direction = "auto") {
   if (!found) return { found: false };
 
   const e = found.entry;
-  const [trw, ex] = await Promise.all([fetchTurkishMeaning(e.lemma), tatoebaExample(e.lemma, [word])]);
+  const [dict, ex] = await Promise.all([
+    lang === "en" ? fetchEnglishMeaning(e.lemma) : fetchTurkishMeaning(e.lemma),
+    tatoebaExample(e.lemma, [word], lang),
+  ]);
 
-  const meaningTR = trw.defs.length ? trw.defs.slice(0, 3).join("; ") : e.translations_tr.slice(0, 5).join(", ");
-  let example = ex;
-  if (!example || example.lang !== "tr") {
-    const trEx = trw.examples[0];
-    if (trEx) example = { de: trEx.de, tr: trEx.tr, lang: "tr", url: "" };
+  // Anlam: hedef dildeki Wiktionary tanımları, yoksa de.wiktionary çeviri tablosu
+  const fallbackList = lang === "en" ? e.translations_en : e.translations_tr;
+  const meaning = dict.defs.length ? dict.defs.slice(0, 3).join("; ") : fallbackList.slice(0, 5).join(", ");
+  // Almanca–Türkçe çiftinde İngilizce karşılıklar ek bilgi olarak gösterilir
+  const meaningAlt = lang === "tr" ? e.translations_en.slice(0, 5).join(", ") : "";
+
+  // Örnek: Tatoeba (hedef dil) → Wiktionary çevirili örnek → Tatoeba (diğer dil) → çevirisiz Wiktionary örneği
+  let example = ex && ex.lang === lang ? ex : null;
+  if (!example && dict.examples[0]) {
+    example = { de: dict.examples[0].de, tr: dict.examples[0].tr, lang, url: "" };
   }
+  if (!example && ex) example = ex;
   if (!example && e.examples[0]) example = { de: e.examples[0], tr: "", lang: "", url: "" };
 
   return {
@@ -501,15 +587,15 @@ export async function freeLookup(rawWord, direction = "auto") {
     article: e.article,
     plural: e.plural,
     ipa: e.ipa,
-    meaning_tr: meaningTR,
-    meaning_en: e.translations_en.slice(0, 5).join(", "),
+    meaning,
+    meaning_alt: meaning ? meaningAlt : "",
     definition_de: e.definitions[0] || "",
     level: "",
     verb: e.verb,
     compound_parts: e.compound_parts,
     example_de: example?.de || "",
-    example_tr: example?.tr || "",
-    example_lang: example?.lang || "",
+    example_translation: example?.tr || "",
+    example_translation_lang: example?.lang || "",
     example_url: example?.url || "",
     note: reverseNote || found.note,
     source: "Wiktionary · Tatoeba",

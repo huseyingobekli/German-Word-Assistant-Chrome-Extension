@@ -4,11 +4,15 @@ Web sayfalarında okuduğunuz Almanca kelimeleri, sayfadan ayrılmadan öğrenme
 Bir kelimeye sağ tıklayıp **Almancasını göster** seçeneğini seçtiğinizde, kelimenin yanında açılan kartta
 anlamı, artikeli, çoğulu, okunuşu ve örnek bir cümle gösterilir.
 
+İki dil çifti desteklenir: **Almanca – Türkçe** ve **Almanca – İngilizce**. Seçilen çifte göre anlamlar,
+örnek cümle çevirileri ve arayüz metinleri Türkçe ya da İngilizce gösterilir.
+
 Eklenti varsayılan olarak tamamen ücretsiz ve açık kaynaklardan (Wiktionary, Tatoeba) beslenir;
 API anahtarı veya hesap gerektirmez.
 
-*A Chrome extension for Turkish speakers learning German: right-click any word to see its lemma, article,
-plural, pronunciation, Turkish meaning and an example sentence. Powered by Wiktionary and Tatoeba.*
+*A Chrome extension for learning German while you read. Right-click any word to see its base form, article,
+plural, pronunciation, meaning and a translated example sentence. Supports German–English and German–Turkish,
+with a fully localized interface. Powered by Wiktionary and Tatoeba; no API key required.*
 
 ## Özellikler
 
@@ -21,9 +25,10 @@ plural, pronunciation, Turkish meaning and an example sentence. Powered by Wikti
 - Birleşik kelime parçalama (`Krankenhausbesuch` → `Krankenhaus + Besuch`); sözlükte bulunmayan birleşik kelimelerde artikel ve anlam parçalardan tahmin edilir
 - Türkçe çevirili, gerçek kişilerce yazılmış örnek cümleler
 
-**Çeviri yönü**
+**Dil çifti ve çeviri yönü**
 
-- Otomatik algılama: Almanca bir kelime için Türkçe anlam, Türkçe veya İngilizce bir kelime için Almanca karşılık gösterilir
+- Almanca – Türkçe veya Almanca – İngilizce; arayüz de seçilen dile geçer
+- Otomatik algılama: Almanca bir kelime için seçilen dildeki anlam, Türkçe veya İngilizce bir kelime için Almanca karşılığı gösterilir
 - Ayarlardan tek bir yöne sabitlenebilir
 
 **Kelime defteri**
@@ -52,7 +57,7 @@ Kurulumdan önce açık olan sekmelerin yenilenmesi önerilir. Eklenti Chromium 
 - Birden fazla kelimelik bir ifade için ifadeyi seçip sağ tıklayın.
 - Kartı kapatmak için `Esc` tuşuna basın veya kartın dışına tıklayın.
 - Eklenti simgesine tıklayarak kelime defterini açabilirsiniz.
-- Ayarlar için eklenti simgesine sağ tıklayıp **Seçenekler**'i seçin.
+- Ayarlar için eklenti simgesine sağ tıklayıp **Seçenekler**'i seçin. Dil çifti buradan değiştirilir; İngilizce seçildiğinde sağ tık menüsü **Look up in German** olarak görünür.
 
 ## Veri kaynakları
 
@@ -60,8 +65,8 @@ Kurulumdan önce açık olan sekmelerin yenilenmesi önerilir. Eklenti Chromium 
 | --- | --- | --- |
 | [de.wiktionary.org](https://de.wiktionary.org) | Artikel, çoğul, IPA, fiil çekimleri, kök hâli, birleşik kelime bilgisi | CC BY-SA 4.0 |
 | [tr.wiktionary.org](https://tr.wiktionary.org) | Almanca kelimelerin Türkçe anlamları, Türkçe kelimelerin Almanca karşılıkları | CC BY-SA 4.0 |
-| [en.wiktionary.org](https://en.wiktionary.org) | İngilizce kelimelerin Almanca karşılıkları | CC BY-SA 4.0 |
-| [Tatoeba](https://tatoeba.org) | Türkçe (bulunamazsa İngilizce) çevirili örnek cümleler | CC BY 2.0 FR |
+| [en.wiktionary.org](https://en.wiktionary.org) | Almanca kelimelerin İngilizce anlamları ve çevirili örnekleri, İngilizce kelimelerin Almanca karşılıkları | CC BY-SA 4.0 |
+| [Tatoeba](https://tatoeba.org) | Seçilen dile çevrilmiş örnek cümleler (Türkçe çiftinde bulunamazsa İngilizce) | CC BY 2.0 FR |
 
 Veriler eklentiyle birlikte dağıtılmaz; her arama sırasında ilgili kaynağın herkese açık API'sinden alınır.
 Kartta her sonucun kaynağı belirtilir ve Tatoeba cümleleri orijinal sayfalarına bağlanır.
@@ -83,6 +88,7 @@ girmeniz gerekir ve kullanım hesabınızdan ücretlendirilir.
 
 ```
 manifest.json    Manifest V3 tanımı
+i18n.js          Arayüz metinleri (Türkçe ve İngilizce); kart, sayfalar ve service worker ortak kullanır
 background.js    Service worker: sağ tık menüsü, kaynak seçimi, Claude API isteği, önbellek, kelime defteri
 sources.js       Ücretsiz sözlük: Wiktionary (de/tr/en) wikitext ayrıştırma ve Tatoeba örnek cümleleri
 content.js       Sayfada çalışan betik: imlecin altındaki kelimeyi bulma, Shadow DOM içinde kart, seslendirme
@@ -105,7 +111,7 @@ Proje herhangi bir derleme adımı veya bağımlılık gerektirmez; dosyalar do�
 ```js
 // test.mjs
 import { freeLookup } from "./sources.js";
-console.log(await freeLookup("Häuser"));
+console.log(await freeLookup("Häuser", "auto", "en")); // dil çifti: "tr" veya "en"
 ```
 
 Wikimedia sunucuları kısa sürede çok sayıda istek gönderen istemcileri geçici olarak sınırlar (HTTP 429).
@@ -121,6 +127,9 @@ Toplu testlerde istekler arasına bekleme eklenmesi önerilir.
 - Açık lisanslı bir kelime listesiyle CEFR seviye etiketi
 
 ## Katkıda bulunma
+
+Yeni bir arayüz dili eklemek için `i18n.js` içine yeni bir dil tablosu eklemek yeterlidir; sözlük tarafında
+ise `sources.js` içinde o dilin Wiktionary sürümü için bir ayrıştırıcı gerekir.
 
 Hata bildirimleri ve öneriler için bir issue açabilir, değişiklikler için pull request gönderebilirsiniz.
 Büyük değişikliklerden önce bir issue üzerinden tartışılması önerilir.
