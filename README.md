@@ -27,7 +27,7 @@ Works out of the box with free, open data sources. No account or API key require
 
 1. Clone the repository or download it as a ZIP:
    ```
-   git clone https://github.com/<username>/almanca-kelime-asistani.git
+   git clone https://github.com/huseyingobekli/German-Word-Assistant-Chrome-Extension.git
    ```
 2. Open `chrome://extensions` and enable **Developer mode**.
 3. Click **Load unpacked** and select the project folder.
