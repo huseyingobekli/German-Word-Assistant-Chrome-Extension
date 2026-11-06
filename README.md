@@ -1,4 +1,10 @@
-# Almanca Kelime Asistanı
+# German Word Assistant
+
+| Settings | Word List | Popup in Action |
+| :---: | :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/e438d3ae-30da-4150-96a4-746ca86f7f99" width="280" /> | <img src="https://github.com/user-attachments/assets/83a60eb9-834a-4ab3-9e68-213c5ec696a5" width="280" /> | <img src="https://github.com/user-attachments/assets/b06642ba-00b4-4ab1-aa70-b28ee27c8414" width="280" /> |
+
+
 
 A Chrome extension for learning German while you read. Right-click any word on a web page to see its
 base form, article, plural, pronunciation, meaning and a translated example sentence.
@@ -76,3 +82,7 @@ Contributions are welcome. Please open an issue to discuss larger changes before
 
 Released under the [MIT License](LICENSE). Dictionary data retrieved at runtime remains subject to the
 licenses of its sources.
+
+ <h2></h2>
+ 
+   Hüseyin Göbekli
