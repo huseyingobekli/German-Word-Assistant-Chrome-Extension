@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kelime Defteri</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    .toolbar input { flex: 1 1 220px; width: auto; }
+    .list { display: grid; gap: 10px; }
+    .item { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+      display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; }
+    .word { font-size: 18px; font-weight: 700; }
+    .meta { color: var(--muted); font-size: 13px; }
+    .meaning { margin-top: 2px; }
+    .ex { margin-top: 6px; font-size: 14px; }
+    .ex .tr { color: var(--muted); }
+    .seen { margin-top: 6px; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+    .side { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+    .icon { border: 1px solid var(--line); background: var(--chip); color: var(--fg); border-radius: 8px;
+      padding: 3px 9px; cursor: pointer; font: inherit; font-size: 13px; }
+    .icon.del:hover { color: var(--die); }
+    .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+    .count { color: var(--muted); }
+    @media (max-width: 560px) { .item { grid-template-columns: 1fr; } .side { flex-direction: row; align-items: center; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Kelime Defteri</h1>
+  <p class="lead"><span class="count" id="count">0 kelime</span> · <a href="options.html">Ayarlar</a></p>
+
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="Ara (Almanca veya Türkçe)…">
+    <button class="btn ghost" id="export">CSV indir (Anki)</button>
+    <button class="btn danger" id="clear">Tümünü sil</button>
+  </div>
+
+  <div class="list" id="list"></div>
+</main>
+<script src="words.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Kişisel planlama notu
+Almanca Öğrenme Chrome Eklentisi.md
+
+# Paketler
+*.zip
+*.crx
+*.pem
+
+# Sistem / editör
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/

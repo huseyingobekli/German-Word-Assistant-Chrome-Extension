@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Almanca Asistanı Ayarları</title>
+  <link rel="stylesheet" href="pages.css">
+</head>
+<body>
+<main style="max-width: 640px">
+  <h1>Ayarlar</h1>
+  <p class="lead">Bir sayfada kelimeye sağ tıklayıp <b>“Almancasını göster”</b> seçeneğini kullan.</p>
+
+  <form class="panel" id="form">
+    <div class="field">
+      <label for="source">Sözlük kaynağı</label>
+      <select id="source">
+        <option value="free">Ücretsiz — Wiktionary + Tatoeba (anahtar gerekmez)</option>
+        <option value="claude">Claude API (anahtar gerekir, ücretli)</option>
+      </select>
+      <p class="hint">Ücretsiz mod; artikel, çoğul, IPA, fiil çekimi ve kök bulmayı Wiktionary'den, çevirili örnek cümleleri Tatoeba'dan alır.
+        Bazı kelimelerde Türkçe anlam olmayabilir; o zaman İngilizce anlam veya Almanca tanım gösterilir. Seviye etiketi (A1–C2) sadece Claude modunda gösterilir.</p>
+    </div>
+
+    <div id="claudeFields">
+    <div class="field">
+      <label for="apiKey">Claude API anahtarı</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+      <p class="hint">Anahtar yalnızca bu tarayıcıda (chrome.storage.local) saklanır ve sadece api.anthropic.com'a gönderilir.
+        Anahtar almak için: <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a></p>
+    </div>
+
+    <div class="field">
+      <label for="model">Model</label>
+      <select id="model">
+        <option value="claude-opus-5-5">Claude Opus 5.5 — en doğru</option>
+        <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — dengeli</option>
+        <option value="claude-haiku-5-5">Claude Haiku 5.5 — en hızlı ve ucuz</option>
+      </select>
+    </div>
+    </div>
+
+    <div class="field">
+      <label for="direction">Çeviri yönü</label>
+      <select id="direction">
+        <option value="auto">Otomatik algıla</option>
+        <option value="de-tr">Almanca → Türkçe</option>
+        <option value="tr-de">Türkçe / İngilizce → Almanca</option>
+      </select>
+      <p class="hint">Otomatikte, Almanca kelimelerin Türkçe anlamı; Türkçe/İngilizce kelimelerin Almanca karşılığı gösterilir.</p>
+    </div>
+
+    <div class="row">
+      <button class="btn" type="submit">Kaydet</button>
+      <button class="btn ghost" type="button" id="test">Bağlantıyı test et</button>
+      <span class="status" id="status"></span>
+    </div>
+  </form>
+
+  <div class="panel row" style="justify-content: space-between">
+    <span>Önbellekteki arama sonuçları</span>
+    <button class="btn ghost" type="button" id="clearCache">Önbelleği temizle</button>
+  </div>
+
+  <p><a href="words.html">Kelime defterine git →</a></p>
+</main>
+<script src="options.js"></script>
+</body>
+</html>
