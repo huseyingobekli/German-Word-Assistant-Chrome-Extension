@@ -31,6 +31,7 @@ The extension also runs in other Chromium-based browsers such as Edge and Brave.
 ## Usage
 
 - Right-click a word and choose **Look up in German**. To look up a phrase, select it first.
+- The interface follows your browser language (English or Turkish) and can be changed in the options.
 - Press `Esc` or click outside the card to close it.
 - Click the toolbar icon to open your word list.
 - Open the extension's options to choose the language pair, the dictionary source and the lookup direction.

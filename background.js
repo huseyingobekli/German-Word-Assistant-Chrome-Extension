@@ -9,7 +9,8 @@ const T = (...a) => globalThis.almancaT(...a);
 const API_URL = "https://api.anthropic.com/v1/messages";
 const API_VERSION = "2026-10-21";
 const DEFAULT_SETTINGS = {
-  lang: "tr", // dil çifti: tr (Almanca–Türkçe) | en (Almanca–İngilizce)
+  // dil çifti: tr (Almanca–Türkçe) | en (Almanca–İngilizce); varsayılan tarayıcı diline göre
+  lang: String(globalThis.navigator?.language || "").toLowerCase().startsWith("tr") ? "tr" : "en",
   source: "free", // free (Wiktionary + Tatoeba) | claude
   apiKey: "",
   model: "claude-opus-5-5",
@@ -26,7 +27,7 @@ async function getSettings() {
   // Eski sürümlerin yön değerleri
   if (s.direction === "de-tr") s.direction = "from-de";
   if (s.direction === "tr-de") s.direction = "to-de";
-  if (s.lang !== "en") s.lang = "tr";
+  if (s.lang !== "en" && s.lang !== "tr") s.lang = DEFAULT_SETTINGS.lang;
   return s;
 }
 

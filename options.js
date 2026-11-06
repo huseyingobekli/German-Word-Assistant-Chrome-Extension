@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { lang: "tr", source: "free", apiKey: "", model: "claude-opus-5-5", direction: "auto" };
+const BROWSER_LANG = navigator.language.toLowerCase().startsWith("tr") ? "tr" : "en";
+const DEFAULTS = { lang: BROWSER_LANG, source: "free", apiKey: "", model: "claude-opus-5-5", direction: "auto" };
 
 const lang = () => $("lang").value;
 const t = (key, vars) => almancaT(lang(), key, vars);
@@ -20,7 +21,7 @@ async function load() {
   const s = { ...DEFAULTS, ...(settings || {}) };
   if (s.direction === "de-tr") s.direction = "from-de";
   if (s.direction === "tr-de") s.direction = "to-de";
-  $("lang").value = s.lang === "en" ? "en" : "tr";
+  $("lang").value = s.lang === "en" || s.lang === "tr" ? s.lang : BROWSER_LANG;
   $("source").value = s.source;
   $("apiKey").value = s.apiKey;
   $("model").value = s.model;

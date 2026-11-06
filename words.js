@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let words = [];
-let lang = "tr";
+const BROWSER_LANG = navigator.language.toLowerCase().startsWith("tr") ? "tr" : "en";
+let lang = BROWSER_LANG;
 const t = (key, vars) => almancaT(lang, key, vars);
 
 // Eski kayıtlardaki Türkçe tür adları
@@ -27,7 +28,7 @@ function typeLabel(code) {
 async function load() {
   const res = await chrome.storage.local.get(["words", "settings"]);
   words = Array.isArray(res.words) ? res.words : [];
-  lang = res.settings?.lang === "en" ? "en" : "tr";
+  lang = ["en", "tr"].includes(res.settings?.lang) ? res.settings.lang : BROWSER_LANG;
   almancaApplyI18n(lang);
   render();
 }
@@ -133,7 +134,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.words) words = Array.isArray(changes.words.newValue) ? changes.words.newValue : [];
   if (changes.settings) {
-    lang = changes.settings.newValue?.lang === "en" ? "en" : "tr";
+    lang = ["en", "tr"].includes(changes.settings.newValue?.lang) ? changes.settings.newValue.lang : BROWSER_LANG;
     almancaApplyI18n(lang);
   }
   if (changes.words || changes.settings) render();
